@@ -1,5 +1,5 @@
 import { _decorator, Component, Node, EventMouse, game, Prefab, instantiate, find, Label, UITransform, Button, director } from 'cc';
-import { CellManager } from "./CellManager";
+import { CellManager, STATE, TYPE } from "./CellManager";
 import { DifficultyManager } from './DifficultyManager';
 
 const { ccclass, property } = _decorator;
@@ -50,15 +50,15 @@ export class GameManager extends Component {
 
     private difficultySelect: Node | null = null;
 
-    private cellsArry: Node[] = [];  //保存每個生成的cell的引用數據
+    private cellsArray: Node[] = [];  //保存每個生成的cell的引用數據
 
     public row!: number; //列(row) 
     public col!: number; //欄(column) 
     public bombnum!: number; //炸彈總數   
     private cellSpacing!: number; //格子之間的間距
     private cellSize!: number //每個格子的大小
-    private spawnPointX!: number  //格子生成點
-    private spawnPointY!: number
+    private spawnPointX!: number  //格子生成點x軸
+    private spawnPointY!: number  //格子生成點y軸
 
     set difficulty(value: DIFFICULTY_STATE) {  //依照難度不同來設定格子的大小及間距
         this._difficulty = value;
@@ -107,7 +107,7 @@ export class GameManager extends Component {
         return this._bombLeft;
     }
 
-    set time(value) {   //計時器同步
+    set time(value) {   //計時器同步至介面上
         this._time = value;
         this.timeLabel!.string = value.toString();
     }
@@ -123,10 +123,11 @@ export class GameManager extends Component {
         this.backBtn!.node.on(Node.EventType.MOUSE_UP, () => director.loadScene("Menu"));  //返回選單按鈕
         this.cellInit();
         this.newGame();
+
     }
 
-    private cellTagGet(cell: Node) { //取得指定格子的tag
-        return cell.getComponent(CellManager)!.tag;
+    private cellScriptGet(cell: Node) {
+        return cell.getComponent(CellManager)!;
     }
 
     private cellInit() {  //格子產生
@@ -135,7 +136,7 @@ export class GameManager extends Component {
                 let cellNode: Node | null = this.spawnCell();
 
                 if (cellNode) {
-                    cellNode.getComponent(CellManager)!.tag = (y * this.col) + x;  //此處的tag代表每個生成的格子的編號
+                    this.cellScriptGet(cellNode).tag = (y * this.col) + x;  //此處的tag代表每個生成的格子的編號
                     cellNode.getComponent(UITransform)!.setContentSize(this.cellSize, this.cellSize);  //新格子大小設定
                     cellNode.setPosition(this.spawnPointX + (this.cellSpacing * x), this.spawnPointY - (this.cellSpacing * y))  //格子定位
 
@@ -150,7 +151,7 @@ export class GameManager extends Component {
                     });
 
                     this.cells!.addChild(cellNode);  //產生的格子設定父節點
-                    this.cellsArry.push(cellNode);
+                    this.cellsArray.push(cellNode);
                 }
             }
         }
@@ -173,62 +174,62 @@ export class GameManager extends Component {
         this.schedule(this.timeRun, 1); //遊戲計時器開始
 
         //初始化場景
-        for (let n = 0; n < this.cellsArry.length; n++) {
-            this.cellsArry[n].getComponent(CellManager)!.type = 0;   //TYPE.ZERO
-            this.cellsArry[n].getComponent(CellManager)!.state = 0;  //STATE.NONE
-        }
+        this.cellsArray.forEach(cell => {
+            this.cellScriptGet(cell).type = TYPE.ZERO
+            this.cellScriptGet(cell).state = STATE.NONE
+        })
         //隨機生成地雷 確保地雷不重複選擇同個位置
         let cellsIndex: number[] = [];
-        for (let i = 0; i < this.cellsArry.length; i++) {
-            cellsIndex[i] = i;
-        }
-        for (let j = 0; j < this.bombnum; j++) {
+        this.cellsArray.forEach((cell, index) => {
+            cellsIndex[index] = index;
+        })
+        for (let i = 0; i < this.bombnum; i++) {
             let n = Math.floor(Math.random() * cellsIndex.length);
-            this.cellsArry[n].getComponent(CellManager)!.type = 10  //TYPE.BOMB
+            this.cellScriptGet(this.cellsArray[n]).type = TYPE.BOMB
             cellsIndex.splice(n, 1);;  //從此位置刪除一個元素
         }
         //標記地雷周圍的格子
-        for (let k = 0; k < this.cellsArry.length; k++) {
+        this.cellsArray.forEach(cell => {
             let tempBomb = 0;
-            if (this.cellsArry[k].getComponent(CellManager)!.type == 0) {
-                let roundCells: Node[] = this.cellRound(k); //抓出格子周圍的格子
-                for (let m = 0; m < roundCells.length; m++) {
-                    if (roundCells[m].getComponent(CellManager)!.type == 10) {
-                        tempBomb++;  //格子周圍有Bomb時+1
+            if (this.cellScriptGet(cell).type == TYPE.ZERO) {
+                let roundCells: Node[] = this.cellRound(this.cellScriptGet(cell).tag);  //抓出此格子周圍的格子
+                roundCells.forEach(rcell => {
+                    if (this.cellScriptGet(rcell).type == TYPE.BOMB) {
+                        tempBomb++; //格子周圍有Bomb時+1
                     }
-                }
-                this.cellsArry[k].getComponent(CellManager)!.type = tempBomb; //格子被點開時的數字等於tempBomb
+                })
+                this.cellScriptGet(cell).type = tempBomb;  //此格的type = 周圍炸彈總數
             }
-        }
+        });
         this._gameState = GAME_STATE.PLAY;
         this.gameMessage!.string = "";
     }
 
-    private cellRound(i: number) {  //取得指定格子周圍的格子 回傳出一個node陣列 
+    private cellRound(i: number) {  //取得指定格子周圍的格子 將它們回傳出一個node陣列 
         let roundCells: Node[] = [];
         if (i % this.col > 0) {  //left
-            roundCells.push(this.cellsArry[i - 1]);
+            roundCells.push(this.cellsArray[i - 1]);
         }
         if (i % this.col > 0 && Math.floor(i / this.col) > 0) {  //left top
-            roundCells.push(this.cellsArry[i - this.col - 1]);
+            roundCells.push(this.cellsArray[i - this.col - 1]);
         }
         if (i % this.col > 0 && Math.floor(i / this.col) < this.row - 1) {  //left bottom
-            roundCells.push(this.cellsArry[i + this.col - 1]);
+            roundCells.push(this.cellsArray[i + this.col - 1]);
         }
         if (Math.floor(i / this.col) > 0) {  //top
-            roundCells.push(this.cellsArry[i - this.col]);
+            roundCells.push(this.cellsArray[i - this.col]);
         }
         if (Math.floor(i / this.col) < this.row - 1) {  //bottom
-            roundCells.push(this.cellsArry[i + this.col]);
+            roundCells.push(this.cellsArray[i + this.col]);
         }
         if (i % this.col < this.col - 1) {  //right
-            roundCells.push(this.cellsArry[i + 1]);
+            roundCells.push(this.cellsArray[i + 1]);
         }
         if (i % this.col < this.col - 1 && Math.floor(i / this.col) > 0) {  //right top
-            roundCells.push(this.cellsArry[i - this.col + 1]);
+            roundCells.push(this.cellsArray[i - this.col + 1]);
         }
         if (i % this.col < this.col - 1 && Math.floor(i / this.col) < this.row - 1) {  //right bottom
-            roundCells.push(this.cellsArry[i + this.col + 1]);
+            roundCells.push(this.cellsArray[i + this.col + 1]);
         }
         return roundCells;
     }
@@ -237,54 +238,59 @@ export class GameManager extends Component {
         if (this._gameState != GAME_STATE.PLAY) {
             return;
         }
+        let touchCellScript: CellManager = this.cellScriptGet(touchCell);
         switch (this._touchState) {
-            case TOUCH_STATE.FLAG:  //右鍵插旗、問號或取消插旗
-                if (touchCell.getComponent(CellManager)!.state == 0) { //None
-                    if (this.bombLeft == 0) {   //插旗格不得超過炸彈總數
-                        touchCell.getComponent(CellManager)!.state = 3  //Doubt
-                        //超過炸彈總數後只會擺放問號
-                        return;
-                    }
-                    touchCell.getComponent(CellManager)!.state = 2; //Flag
-                    this.bombLeft -= 1;
-                }
-                else if (touchCell.getComponent(CellManager)!.state == 2) {  //Flag
-                    touchCell.getComponent(CellManager)!.state = 3  //Doubt
-                    this.bombLeft += 1;
-                }
-                else if (touchCell.getComponent(CellManager)!.state == 3) {  //Doubt
-                    touchCell.getComponent(CellManager)!.state = 0  //None
+            case TOUCH_STATE.FLAG:  //右鍵插旗、問號或取消插旗               
+                switch (touchCellScript.state) {
+                    case STATE.NONE:  //順序：空格>插旗>問號>空格 ...
+                        if (this.bombLeft == 0) {   //插旗格數量不得超過炸彈總數
+                            touchCellScript.state = STATE.DOUBT  //超過炸彈總數後只會擺放問號
+                            return;
+                        }
+                        touchCellScript.state = STATE.FLAG;
+                        this.bombLeft -= 1;
+                        break;
+                    case STATE.FLAG:
+                        touchCellScript.state = STATE.DOUBT
+                        this.bombLeft += 1;
+                        break;
+                    case STATE.DOUBT:
+                        touchCellScript.state = STATE.NONE
+                        break;
+                    default:
+                        break;
                 }
                 break;
             case TOUCH_STATE.BLANK:  //左鍵點擊格子
-                if (touchCell.getComponent(CellManager)!.state == 2) {  //Flag
+                if (touchCellScript.state == STATE.FLAG) {
                     return;  //無法點擊插旗格
                 }
-                if (touchCell.getComponent(CellManager)!.type === 10) {  //CLICKEDBOMB  點到炸彈
-                    touchCell.getComponent(CellManager)!.type = 9;  //被點到的炸彈底色為紅色
-                    touchCell.getComponent(CellManager)!.state = 1;  //Clicked
+                if (touchCellScript.type == TYPE.BOMB) {  //點到炸彈
+                    touchCellScript.type = TYPE.CLICKEDBOMB;  //被點到的炸彈底色變為紅色
+                    touchCellScript.state = STATE.CLIKED;
                     this.gameOver();
                     return;
                 }
                 let testCells: Node[] = [];
-                if (touchCell.getComponent(CellManager)!.state === 0 || 3) { //None
+                if (touchCellScript.state == STATE.NONE || STATE.DOUBT) {  //點到一般格子或問號
                     testCells.push(touchCell);
                     while (testCells.length) {
-                        let testCell: Node | undefined = testCells.pop();
-                        if (testCell!.getComponent(CellManager)!.type === 0) {  //Zero
-                            testCell!.getComponent(CellManager)!.state = 1;   //Clicked
-                            let roundCells = this.cellRound(this.cellTagGet(testCell!)); //檢查周圍格子
-                            for (let i = 0; i < roundCells.length; i++) {
-                                if (roundCells[i].getComponent(CellManager)!.state === 0) { //None
-                                    testCells.push(roundCells[i]);  //將空地也放進去一並檢查
+                        let testCell: Node = testCells.pop()!;
+                        let testCellScript: CellManager = this.cellScriptGet(testCell);
+                        if (testCellScript.type == TYPE.ZERO) { //點開相連的空地
+                            testCellScript.state = STATE.CLIKED;
+                            let roundCells = this.cellRound(testCellScript.tag); //檢查周圍格子
+                            roundCells.forEach(cell => {
+                                if (this.cellScriptGet(cell).state == STATE.NONE) {
+                                    testCells.push(cell);  //將附近的空地也放進去一並檢查
                                 }
-                                if (roundCells[i].getComponent(CellManager)!.state === 3) { //Doubt
-                                    testCells.push(roundCells[i]);  //檢查問烙   
+                                if (this.cellScriptGet(cell).state == STATE.DOUBT) {
+                                    testCells.push(cell);  //將問號也放進去一並檢查
                                 }
-                            }
+                            })
                         }
-                        else if (testCell!.getComponent(CellManager)!.type > 0 && testCell!.getComponent(CellManager)!.type < 9) {
-                            testCell!.getComponent(CellManager)!.state = 1; //Clicked
+                        else if (testCellScript.type > TYPE.ZERO && testCellScript.type < TYPE.BOMB) {
+                            testCellScript.state = STATE.CLIKED;
                         }
                     }
                     this.judgeWin();
@@ -297,12 +303,12 @@ export class GameManager extends Component {
     private judgeWin() {
         let confNum = 0;
         //判斷是否勝利
-        for (let i = 0; i < this.cellsArry.length; i++) {
-            if (this.cellsArry[i].getComponent(CellManager)!.state === 1) {
+        this.cellsArray.forEach(cell => {
+            if (this.cellScriptGet(cell).state == STATE.CLIKED) {
                 confNum++;
             }
-        }
-        if (confNum === this.cellsArry.length - this.bombnum) { //點開空格數 = 格子總數 - 炸彈總數 時獲勝
+        })
+        if (confNum == this.cellsArray.length - this.bombnum) { //點開空格數 = 格子總數 - 炸彈總數 時獲勝
             this._gameState = GAME_STATE.WIN;
             this.gameMessage!.string = "You Win！";
             this.reStartGame();
@@ -310,9 +316,9 @@ export class GameManager extends Component {
     }
 
     private gameOver() {
-        for (let i = 0; i < this.cellsArry.length; i++) {  //失敗的時候讓所有格子現形
-            this.cellsArry[i].getComponent(CellManager)!.state = 1; //Clicked
-        }
+        this.cellsArray.forEach(cell => {  //失敗的時候揭露所有格子
+            this.cellScriptGet(cell).state = STATE.CLIKED;
+        })
 
         this._gameState = GAME_STATE.DEAD;
         this.gameMessage!.string = "You Lose！";

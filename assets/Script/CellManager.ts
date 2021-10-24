@@ -2,7 +2,7 @@ import { _decorator, Component, Node, Sprite, SpriteFrame } from 'cc';
 
 const { ccclass, property } = _decorator;
 
-const enum TYPE {  //格子類型
+export const enum TYPE {  //格子類型
   ZERO = 0,
   ONE = 1,
   TWO = 2,
@@ -12,11 +12,11 @@ const enum TYPE {  //格子類型
   SIX = 6,
   SEVEN = 7,
   EIGHT = 8,
-  CLICKEDBOMB = 9,  //被點到的炸彈
-  BOMB = 10  //其他炸彈
+  BOMB = 9,  //被點到的炸彈
+  CLICKEDBOMB = 10  //其他炸彈
 }
 
-const enum STATE {
+export const enum STATE {
   NONE = 0,//未點擊
   CLIKED = 1,//已點開
   FLAG = 2,//插旗
