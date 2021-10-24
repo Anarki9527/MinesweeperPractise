@@ -18,7 +18,7 @@ export const enum TYPE {  //格子類型
 
 export const enum STATE {
   NONE = 0,//未點擊
-  CLIKED = 1,//已點開
+  CLICKED = 1,//已點開
   FLAG = 2,//插旗
   DOUBT = 3,//問號
 }
@@ -72,7 +72,7 @@ export class CellManager extends Component {
         case STATE.NONE:
           this._sprite.spriteFrame = this.picNone;
           break;
-        case STATE.CLIKED:
+        case STATE.CLICKED:
           this.showType();
           break;
         case STATE.FLAG:

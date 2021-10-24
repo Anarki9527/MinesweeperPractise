@@ -267,7 +267,7 @@ export class GameManager extends Component {
                 }
                 if (touchCellScript.type == TYPE.BOMB) {  //點到炸彈
                     touchCellScript.type = TYPE.CLICKEDBOMB;  //被點到的炸彈底色變為紅色
-                    touchCellScript.state = STATE.CLIKED;
+                    touchCellScript.state = STATE.CLICKED;
                     this.gameOver();
                     return;
                 }
@@ -278,7 +278,7 @@ export class GameManager extends Component {
                         let testCell: Node = testCells.pop()!;
                         let testCellScript: CellManager = this.cellScriptGet(testCell);
                         if (testCellScript.type == TYPE.ZERO) { //點開相連的空地
-                            testCellScript.state = STATE.CLIKED;
+                            testCellScript.state = STATE.CLICKED;
                             let roundCells = this.cellRound(testCellScript.tag); //檢查周圍格子
                             roundCells.forEach(cell => {
                                 if (this.cellScriptGet(cell).state == STATE.NONE) {
@@ -290,7 +290,7 @@ export class GameManager extends Component {
                             })
                         }
                         else if (testCellScript.type > TYPE.ZERO && testCellScript.type < TYPE.BOMB) {
-                            testCellScript.state = STATE.CLIKED;
+                            testCellScript.state = STATE.CLICKED;
                         }
                     }
                     this.judgeWin();
@@ -304,7 +304,7 @@ export class GameManager extends Component {
         let confNum = 0;
         //判斷是否勝利
         this.cellsArray.forEach(cell => {
-            if (this.cellScriptGet(cell).state == STATE.CLIKED) {
+            if (this.cellScriptGet(cell).state == STATE.CLICKED) {
                 confNum++;
             }
         })
@@ -317,7 +317,7 @@ export class GameManager extends Component {
 
     private gameOver() {
         this.cellsArray.forEach(cell => {  //失敗的時候揭露所有格子
-            this.cellScriptGet(cell).state = STATE.CLIKED;
+            this.cellScriptGet(cell).state = STATE.CLICKED;
         })
 
         this._gameState = GAME_STATE.DEAD;
