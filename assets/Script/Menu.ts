@@ -1,5 +1,5 @@
 import { _decorator, Component, Node, ToggleComponent, director,  game } from 'cc';
-import { DifficultyManager } from "./DifficultyManager";
+import { DifficultyManager , DIFFICULTY_STATE } from "./DifficultyManager";
 
 const { ccclass, property } = _decorator;
 
@@ -40,9 +40,9 @@ export class Menu extends Component {
         //難度選擇頁面
         this.cancelBtn!.on(Node.EventType.MOUSE_UP, () => { this.selectPanel!.active = false; }, this);
         this.confirmBtn!.on(Node.EventType.MOUSE_UP, () => { director.loadScene("Game"); }, this);
-        this.toggleNewbie!.node.on('toggle', () => { difficultyManager.difficultySelected = 0; }, this); //初級
-        this.toggleMedium!.node.on('toggle', () => { difficultyManager.difficultySelected = 1; }, this); //中級
-        this.toggleVeteran!.node.on('toggle', () => { difficultyManager.difficultySelected = 2; }, this); //高級
+        this.toggleNewbie!.node.on('toggle', () => { difficultyManager.difficulty = DIFFICULTY_STATE.NEWBIE; }, this); //初級
+        this.toggleMedium!.node.on('toggle', () => { difficultyManager.difficulty = DIFFICULTY_STATE.MEDIUM; }, this); //中級
+        this.toggleVeteran!.node.on('toggle', () => { difficultyManager.difficulty = DIFFICULTY_STATE.VETERAN; }, this); //高級
 
         //操作說明頁面
         this.ipCancelBtn!.on(Node.EventType.MOUSE_UP, () => { this.infoPanel!.active = false; }, this);

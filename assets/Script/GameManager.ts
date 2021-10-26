@@ -1,6 +1,6 @@
 import { _decorator, Component, Node, EventMouse, game, Prefab, instantiate, find, Label, UITransform, Button, director } from 'cc';
-import { CellManager, STATE, TYPE } from "./CellManager";
-import { DifficultyManager } from './DifficultyManager';
+import { Cell, STATE, TYPE } from "./Cell";
+import { DifficultyManager, IGameConfig } from './DifficultyManager';
 
 const { ccclass, property } = _decorator;
 
@@ -44,7 +44,6 @@ export class GameManager extends Component {
 
     private _gameState: GAME_STATE = GAME_STATE.PREPARE;
     private _touchState!: TOUCH_STATE; //左鍵點開格子、右鍵插旗
-    private _difficulty!: DIFFICULTY_STATE;
     private _bombLeft!: number;   //炸彈剩餘數量
     private _time!: number;  //計時器   
 
@@ -54,55 +53,18 @@ export class GameManager extends Component {
 
     public row!: number; //列(row) 
     public col!: number; //欄(column) 
-    public bombnum!: number; //炸彈總數   
+    public bombNum!: number; //炸彈總數   
     private cellSpacing!: number; //格子之間的間距
     private cellSize!: number //每個格子的大小
     private spawnPointX!: number  //格子生成點x軸
     private spawnPointY!: number  //格子生成點y軸
 
-    set difficulty(value: DIFFICULTY_STATE) {  //依照難度不同來設定格子的大小及間距
-        this._difficulty = value;
-        switch (this._difficulty) {
-            case DIFFICULTY_STATE.NEWBIE:
-                this.cellSpacing = 55;
-                this.cellSize = 50;
-                this.row = 9;
-                this.col = 9;
-                this.bombnum = 10
-                this.spawnPointX = -215
-                this.spawnPointY = 200
-                break;
-            case DIFFICULTY_STATE.MEDIUM:
-                this.cellSpacing = 33;
-                this.cellSize = 30;
-                this.row = 16;
-                this.col = 16;
-                this.bombnum = 40
-                this.spawnPointX = -250
-                this.spawnPointY = 220
-                break;
-            case DIFFICULTY_STATE.VETERAN:
-                this.cellSpacing = 24;
-                this.cellSize = 21;
-                this.row = 22;
-                this.col = 22;
-                this.bombnum = 99
-                this.spawnPointX = -245
-                this.spawnPointY = 230
-                break;
-            default:
-                break;
-        }
-    }
-    get difficulty() {
-        return this._difficulty;
-    }
+    private loadGameConfig!: IGameConfig;
 
     set bombLeft(value) {   //炸彈剩餘數量同步至介面上
         this._bombLeft = value;
         this.bombLeftLabel!.string = value.toString();
     }
-
     get bombLeft() {
         return this._bombLeft;
     }
@@ -111,23 +73,32 @@ export class GameManager extends Component {
         this._time = value;
         this.timeLabel!.string = value.toString();
     }
-
     get time() {
         return this._time;
     }
 
     start() {
         this.difficultySelect = find("DifficultySelect");  //抓常駐節點
-        game.removePersistRootNode(this.difficultySelect!)
-        this.difficulty = this.difficultySelect!.getComponent(DifficultyManager)!.difficultySelected;  //取得難度資訊
-        this.backBtn!.node.on(Node.EventType.MOUSE_UP, () => director.loadScene("Menu"));  //返回選單按鈕
+        this.backBtn!.node.on(Node.EventType.MOUSE_UP, () => { //返回選單按鈕
+            game.removePersistRootNode(this.difficultySelect!); //返回選單的時候移除常駐節點
+            director.loadScene("Menu");
+        });  
+
+        this.loadGameConfig = this.difficultySelect!.getComponent(DifficultyManager)!.gameConfig;  //取得格子的各種屬性並設定
+        this.cellSpacing = this.loadGameConfig.cellSpacing;
+        this.cellSize = this.loadGameConfig.cellSize;
+        this.row = this.loadGameConfig.row;
+        this.col = this.loadGameConfig.col;
+        this.bombNum = this.loadGameConfig.bombNum;
+        this.spawnPointX = this.loadGameConfig.spawnPointX;
+        this.spawnPointY = this.loadGameConfig.spawnPointY;
+
         this.cellInit();
         this.newGame();
-
     }
 
     private cellScriptGet(cell: Node) {
-        return cell.getComponent(CellManager)!;
+        return cell.getComponent(Cell)!;
     }
 
     private cellInit() {  //格子產生
@@ -169,7 +140,7 @@ export class GameManager extends Component {
     }
 
     private newGame() {  //開始新遊戲
-        this.bombLeft = this.bombnum;  //剩餘炸彈數量回歸
+        this.bombLeft = this.bombNum;  //剩餘炸彈數量回歸
         this.time = 0;  //計時器歸零
         this.schedule(this.timeRun, 1); //遊戲計時器開始
 
@@ -183,7 +154,7 @@ export class GameManager extends Component {
         this.cellsArray.forEach((cell, index) => {
             cellsIndex[index] = index;
         })
-        for (let i = 0; i < this.bombnum; i++) {
+        for (let i = 0; i < this.bombNum; i++) {
             let n = Math.floor(Math.random() * cellsIndex.length);
             this.cellScriptGet(this.cellsArray[n]).type = TYPE.BOMB
             cellsIndex.splice(n, 1);;  //從此位置刪除一個元素
@@ -238,7 +209,7 @@ export class GameManager extends Component {
         if (this._gameState != GAME_STATE.PLAY) {
             return;
         }
-        let touchCellScript: CellManager = this.cellScriptGet(touchCell);
+        let touchCellScript: Cell = this.cellScriptGet(touchCell);
         switch (this._touchState) {
             case TOUCH_STATE.FLAG:  //右鍵插旗、問號或取消插旗               
                 switch (touchCellScript.state) {
@@ -276,7 +247,7 @@ export class GameManager extends Component {
                     testCells.push(touchCell);
                     while (testCells.length) {
                         let testCell: Node = testCells.pop()!;
-                        let testCellScript: CellManager = this.cellScriptGet(testCell);
+                        let testCellScript: Cell = this.cellScriptGet(testCell);
                         if (testCellScript.type == TYPE.ZERO) { //點開相連的空地
                             testCellScript.state = STATE.CLICKED;
                             let roundCells = this.cellRound(testCellScript.tag); //檢查周圍格子
@@ -308,7 +279,7 @@ export class GameManager extends Component {
                 confNum++;
             }
         })
-        if (confNum == this.cellsArray.length - this.bombnum) { //點開空格數 = 格子總數 - 炸彈總數 時獲勝
+        if (confNum == this.cellsArray.length - this.bombNum) { //點開空格數 = 格子總數 - 炸彈總數 時獲勝
             this._gameState = GAME_STATE.WIN;
             this.gameMessage!.string = "You Win！";
             this.reStartGame();

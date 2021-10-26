@@ -29,7 +29,7 @@
       }
     ],
     "_prefab": {
-      "__id__": 7
+      "__id__": 8
     },
     "_lpos": {
       "__type__": "cc.Vec3",
@@ -132,71 +132,21 @@
     "fileId": "e71ctEmpxFC4KlSYRZNz/a"
   },
   {
-    "__type__": "8cbb2f5z3JBWa/UnP0QTzqe",
+    "__type__": "be4199ctvxB3LaGxNW7s0ZG",
     "_name": "",
     "_objFlags": 0,
     "node": {
       "__id__": 1
     },
     "_enabled": true,
-    "__prefab": null,
-    "picNone": {
-      "__uuid__": "4dae8d6b-ebfd-4245-985a-fc060545c6f9@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picFlag": {
-      "__uuid__": "8987bc74-2524-438c-b69b-4c24a5b4cc79@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picDoubt": {
-      "__uuid__": "8bed6e27-7c17-4faa-9474-8e10d8c9674b@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picZero": {
-      "__uuid__": "dbc1ae22-5540-4dfb-bf4d-4042ec6905fa@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picOne": {
-      "__uuid__": "a0f6eeea-1c06-4c29-8e43-a5c0b2d6f216@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picTwo": {
-      "__uuid__": "05de3fc7-a861-4d49-9f3b-ba7f7d613e32@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picThree": {
-      "__uuid__": "ff6de216-79ce-4e2f-9783-e35d351f42fa@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picFour": {
-      "__uuid__": "b3d52a31-40a1-46b3-8ec3-743c09394522@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picFive": {
-      "__uuid__": "454cb464-d53b-4ef4-8208-08c4225848bc@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picSix": {
-      "__uuid__": "e367dff5-8032-4390-aebc-ac63f2479245@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picSeven": {
-      "__uuid__": "3a0833db-3374-4a4a-ac4e-ec37a05f6d45@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picEight": {
-      "__uuid__": "1f42cbf2-3fc1-4c1a-ad8a-7090b3658411@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picBombBlowUp": {
-      "__uuid__": "b68213f6-6267-42f8-b981-b4cb6f32a8d7@f9941",
-      "__expectedType__": "cc.SpriteFrame"
-    },
-    "picBomb": {
-      "__uuid__": "f5ed2669-53bf-4187-8938-a82fa522c427@f9941",
-      "__expectedType__": "cc.SpriteFrame"
+    "__prefab": {
+      "__id__": 7
     },
     "_id": ""
+  },
+  {
+    "__type__": "cc.CompPrefabInfo",
+    "fileId": "389xuvf7VPNpW/guNImhk4"
   },
   {
     "__type__": "cc.PrefabInfo",
