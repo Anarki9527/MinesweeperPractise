@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, EventMouse, game, Prefab, instantiate, find, Label, UITransform, Button, director } from 'cc';
+import { _decorator, Component, Node, EventMouse, game, Prefab, instantiate, find, Label, UITransform, Button, director, math } from 'cc';
 import { Cell, STATE, TYPE } from "./Cell";
 import { DifficultyManager, IGameConfig } from './DifficultyManager';
 
@@ -14,12 +14,6 @@ enum GAME_STATE {
 enum TOUCH_STATE {
     BLANK = 0,
     FLAG = 1
-}
-
-enum DIFFICULTY_STATE {
-    NEWBIE = 0, //初級 9*9  10顆地雷  格子大小為40*40 間隔為45
-    MEDIUM = 1, //中級 16*16  40顆地雷
-    VETERAN = 2 //高級 22*22  99顆地雷
 }
 
 @ccclass('GameManager')
@@ -43,11 +37,10 @@ export class GameManager extends Component {
     public timeLabel: Label | null = null;  //計時器   
 
     private _gameState: GAME_STATE = GAME_STATE.PREPARE;
-    private _touchState!: TOUCH_STATE; //左鍵點開格子、右鍵插旗
     private _bombLeft!: number;   //炸彈剩餘數量
     private _time!: number;  //計時器   
 
-    private difficultySelect: Node | null = null;
+    private difficultySelect: Node | null = null;  //用來抓取儲存難度資訊用的常駐節點
 
     private cellsArray: Node[] = [];  //保存每個生成的cell的引用數據
 
@@ -79,12 +72,26 @@ export class GameManager extends Component {
 
     start() {
         this.difficultySelect = find("DifficultySelect");  //抓常駐節點
-        this.backBtn!.node.on(Node.EventType.MOUSE_UP, () => { //返回選單按鈕
-            game.removePersistRootNode(this.difficultySelect!); //返回選單的時候移除常駐節點
-            director.loadScene("Menu");
-        });  
+        this.backBtn!.node.on(Node.EventType.MOUSE_UP,this.backToMenu,this);  //返回選單按鈕
+        
+        this.gameConfigLoad();
+        this.cellInit();
+        this.newGame();
+    }
 
-        this.loadGameConfig = this.difficultySelect!.getComponent(DifficultyManager)!.gameConfig;  //取得格子的各種屬性並設定
+    private backToMenu(){  //返回選單按鈕
+        game.removePersistRootNode(this.difficultySelect!); //返回選單的時候移除常駐節點
+        director.loadScene("Menu");
+}
+
+    private cellScriptGet(cell: Node) {  //取得指定Cell身上的Cell腳本
+        return cell.getComponent(Cell)!;
+    }
+
+    private gameConfigLoad() {  //取得難度資訊並載入格子屬性
+        let difMg: DifficultyManager = this.difficultySelect!.getComponent(DifficultyManager)!
+        this.loadGameConfig = difMg.difficultyMap.get(difMg.difficulty);  //取得格子的各種屬性以在接下來套用
+
         this.cellSpacing = this.loadGameConfig.cellSpacing;
         this.cellSize = this.loadGameConfig.cellSize;
         this.row = this.loadGameConfig.row;
@@ -92,13 +99,6 @@ export class GameManager extends Component {
         this.bombNum = this.loadGameConfig.bombNum;
         this.spawnPointX = this.loadGameConfig.spawnPointX;
         this.spawnPointY = this.loadGameConfig.spawnPointY;
-
-        this.cellInit();
-        this.newGame();
-    }
-
-    private cellScriptGet(cell: Node) {
-        return cell.getComponent(Cell)!;
     }
 
     private cellInit() {  //格子產生
@@ -106,24 +106,28 @@ export class GameManager extends Component {
             for (let x = 0; x < this.col; x++) {
                 let cellNode: Node | null = this.spawnCell();
 
-                if (cellNode) {
-                    this.cellScriptGet(cellNode).tag = (y * this.col) + x;  //此處的tag代表每個生成的格子的編號
-                    cellNode.getComponent(UITransform)!.setContentSize(this.cellSize, this.cellSize);  //新格子大小設定
-                    cellNode.setPosition(this.spawnPointX + (this.cellSpacing * x), this.spawnPointY - (this.cellSpacing * y))  //格子定位
+                if (!cellNode){
+                    return;
+                } 
 
-                    cellNode.on(Node.EventType.MOUSE_UP, (event: EventMouse) => {  //滑鼠事件監聽
-                        if (event.getButton() === EventMouse.BUTTON_LEFT) {  //左鍵點開格子
-                            this._touchState = TOUCH_STATE.BLANK;
-                        }
-                        else if (event.getButton() === EventMouse.BUTTON_RIGHT) {  //右鍵插旗
-                            this._touchState = TOUCH_STATE.FLAG;
-                        }
-                        this.onTouchCell(cellNode!);
-                    });
+                this.cellScriptGet(cellNode).tag = (y * this.col) + x;  //此處的tag代表每個生成的格子的編號
+                cellNode.getComponent(UITransform)!.setContentSize(this.cellSize, this.cellSize);  //新格子大小設定
+                cellNode.setPosition(this.spawnPointX + (this.cellSpacing * x), this.spawnPointY - (this.cellSpacing * y))  //格子定位
 
-                    this.cells!.addChild(cellNode);  //產生的格子設定父節點
-                    this.cellsArray.push(cellNode);
-                }
+                cellNode.on(Node.EventType.MOUSE_UP, (event: EventMouse) => {  //滑鼠事件監聽
+                    if (this._gameState != GAME_STATE.PLAY) {
+                        return;
+                    }
+
+                    if (event.getButton() === EventMouse.BUTTON_LEFT) {  //左鍵點開格子
+                        this.onTouchCellBlank(cellNode!);
+                    }
+                    else if (event.getButton() === EventMouse.BUTTON_RIGHT) {  //右鍵插旗
+                        this.onTouchCellFlag(cellNode!);
+                    }
+                });
+                this.cells!.addChild(cellNode);  //產生的格子放進父節點
+                this.cellsArray.push(cellNode); 
             }
         }
     }
@@ -140,26 +144,42 @@ export class GameManager extends Component {
     }
 
     private newGame() {  //開始新遊戲
+        this.resetGameUI();  //重置UI
+        this.resetCells();  //初始化格子
+        this.resetMinesSpawn();  //重置地雷
+        this.resetMinesAround();  //標記地雷周圍的格子
+        this._gameState = GAME_STATE.PLAY;
+    }
+
+    private resetGameUI(){  //重置UI
         this.bombLeft = this.bombNum;  //剩餘炸彈數量回歸
         this.time = 0;  //計時器歸零
         this.schedule(this.timeRun, 1); //遊戲計時器開始
+        this.gameMessage!.string = "";
+    }
 
-        //初始化場景
+    private resetCells(){  //初始化格子
         this.cellsArray.forEach(cell => {
             this.cellScriptGet(cell).type = TYPE.ZERO
             this.cellScriptGet(cell).state = STATE.NONE
         })
-        //隨機生成地雷 確保地雷不重複選擇同個位置
+    }
+
+    private resetMinesSpawn(){  //隨機生成地雷 並確保地雷不重複選擇同個位置
         let cellsIndex: number[] = [];
+        
         this.cellsArray.forEach((cell, index) => {
-            cellsIndex[index] = index;
+            cellsIndex[index] = index;            
         })
-        for (let i = 0; i < this.bombNum; i++) {
-            let n = Math.floor(Math.random() * cellsIndex.length);
-            this.cellScriptGet(this.cellsArray[n]).type = TYPE.BOMB
+        
+        for (let i = 0; i < this.bombNum; i++) {            
+            let n = Math.floor(Math.random() * cellsIndex.length);            
+            this.cellScriptGet(this.cellsArray[cellsIndex[n]]).type = TYPE.BOMB
             cellsIndex.splice(n, 1);;  //從此位置刪除一個元素
         }
-        //標記地雷周圍的格子
+    }
+
+    private resetMinesAround(){  //標記地雷周圍的格子
         this.cellsArray.forEach(cell => {
             let tempBomb = 0;
             if (this.cellScriptGet(cell).type == TYPE.ZERO) {
@@ -172,8 +192,6 @@ export class GameManager extends Component {
                 this.cellScriptGet(cell).type = tempBomb;  //此格的type = 周圍炸彈總數
             }
         });
-        this._gameState = GAME_STATE.PLAY;
-        this.gameMessage!.string = "";
     }
 
     private cellRound(i: number) {  //取得指定格子周圍的格子 將它們回傳出一個node陣列 
@@ -205,69 +223,68 @@ export class GameManager extends Component {
         return roundCells;
     }
 
-    private onTouchCell(touchCell: Node) {
-        if (this._gameState != GAME_STATE.PLAY) {
+    private onTouchCellBlank(touchCell: Node) {
+        let touchCellScript: Cell = this.cellScriptGet(touchCell);
+
+        if (touchCellScript.state == STATE.FLAG) {
+            return;  //無法點擊插旗格
+        }
+
+        if (touchCellScript.type == TYPE.BOMB) {  //點到炸彈
+            this.gameOver(touchCell);  //遊戲失敗
             return;
         }
+
+        if (touchCellScript.state == STATE.NONE || STATE.DOUBT) {  //點到一般格子或問號
+            this.onTouchCellNone(touchCell);
+        }
+    }
+
+    private onTouchCellNone(touchCell : Node){
+        let testCells: Node[] = [];
+        testCells.push(touchCell);
+        while (testCells.length) {
+            let testCell: Node = testCells.pop()!;
+            let testCellScript: Cell = this.cellScriptGet(testCell);
+            if (testCellScript.type == TYPE.ZERO) { //點開相連的空地
+                testCellScript.state = STATE.CLICKED;
+                let roundCells = this.cellRound(testCellScript.tag); //檢查周圍格子
+                roundCells.forEach(cell => {
+                    if (this.cellScriptGet(cell).state == STATE.NONE) {
+                        testCells.push(cell);  //將附近的空地也放進去一並檢查
+                    }
+                    if (this.cellScriptGet(cell).state == STATE.DOUBT) {
+                        testCells.push(cell);  //將問號也放進去一並檢查
+                    }
+                })
+            }
+            else if (testCellScript.type > TYPE.ZERO && testCellScript.type < TYPE.BOMB) {
+                testCellScript.state = STATE.CLICKED;
+            }
+        }
+        this.judgeWin();
+    }
+
+    private onTouchCellFlag(touchCell: Node) {
         let touchCellScript: Cell = this.cellScriptGet(touchCell);
-        switch (this._touchState) {
-            case TOUCH_STATE.FLAG:  //右鍵插旗、問號或取消插旗               
-                switch (touchCellScript.state) {
-                    case STATE.NONE:  //順序：空格>插旗>問號>空格 ...
-                        if (this.bombLeft == 0) {   //插旗格數量不得超過炸彈總數
-                            touchCellScript.state = STATE.DOUBT  //超過炸彈總數後只會擺放問號
-                            return;
-                        }
-                        touchCellScript.state = STATE.FLAG;
-                        this.bombLeft -= 1;
-                        break;
-                    case STATE.FLAG:
-                        touchCellScript.state = STATE.DOUBT
-                        this.bombLeft += 1;
-                        break;
-                    case STATE.DOUBT:
-                        touchCellScript.state = STATE.NONE
-                        break;
-                    default:
-                        break;
-                }
-                break;
-            case TOUCH_STATE.BLANK:  //左鍵點擊格子
-                if (touchCellScript.state == STATE.FLAG) {
-                    return;  //無法點擊插旗格
-                }
-                if (touchCellScript.type == TYPE.BOMB) {  //點到炸彈
-                    touchCellScript.type = TYPE.CLICKEDBOMB;  //被點到的炸彈底色變為紅色
-                    touchCellScript.state = STATE.CLICKED;
-                    this.gameOver();
+        switch (touchCellScript.state) {
+            case STATE.NONE:  //順序：空格>插旗>問號>空格 ...
+                if (this.bombLeft == 0) {   //插旗格數量不得超過炸彈總數
+                    touchCellScript.state = STATE.DOUBT  //超過炸彈總數後只會擺放問號
                     return;
                 }
-                let testCells: Node[] = [];
-                if (touchCellScript.state == STATE.NONE || STATE.DOUBT) {  //點到一般格子或問號
-                    testCells.push(touchCell);
-                    while (testCells.length) {
-                        let testCell: Node = testCells.pop()!;
-                        let testCellScript: Cell = this.cellScriptGet(testCell);
-                        if (testCellScript.type == TYPE.ZERO) { //點開相連的空地
-                            testCellScript.state = STATE.CLICKED;
-                            let roundCells = this.cellRound(testCellScript.tag); //檢查周圍格子
-                            roundCells.forEach(cell => {
-                                if (this.cellScriptGet(cell).state == STATE.NONE) {
-                                    testCells.push(cell);  //將附近的空地也放進去一並檢查
-                                }
-                                if (this.cellScriptGet(cell).state == STATE.DOUBT) {
-                                    testCells.push(cell);  //將問號也放進去一並檢查
-                                }
-                            })
-                        }
-                        else if (testCellScript.type > TYPE.ZERO && testCellScript.type < TYPE.BOMB) {
-                            testCellScript.state = STATE.CLICKED;
-                        }
-                    }
-                    this.judgeWin();
-                }
+                touchCellScript.state = STATE.FLAG;
+                this.bombLeft -= 1;
                 break;
-            default: break;
+            case STATE.FLAG:
+                touchCellScript.state = STATE.DOUBT
+                this.bombLeft += 1;
+                break;
+            case STATE.DOUBT:
+                touchCellScript.state = STATE.NONE
+                break;
+            default:
+                break;
         }
     }
 
@@ -286,7 +303,12 @@ export class GameManager extends Component {
         }
     }
 
-    private gameOver() {
+    private gameOver(touchCell: Node) {
+        let touchCellScript: Cell = this.cellScriptGet(touchCell);
+
+        touchCellScript.type = TYPE.CLICKEDBOMB;  //被點到的炸彈底色變為紅色
+        touchCellScript.state = STATE.CLICKED;
+
         this.cellsArray.forEach(cell => {  //失敗的時候揭露所有格子
             this.cellScriptGet(cell).state = STATE.CLICKED;
         })

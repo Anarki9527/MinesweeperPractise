@@ -1615,7 +1615,6 @@
       "__id__": 61
     },
     "_enabled": true,
-    "__prefab": null,
     "cell": {
       "__uuid__": "71f7c644-4661-4257-8de9-b7ceabb53fa6",
       "__expectedType__": "cc.Prefab"
