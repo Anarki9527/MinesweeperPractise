@@ -72,17 +72,17 @@ export class GameManager extends Component {
 
     start() {
         this.difficultySelect = find("DifficultySelect");  //抓常駐節點
-        this.backBtn!.node.on(Node.EventType.MOUSE_UP,this.backToMenu,this);  //返回選單按鈕
-        
+        this.backBtn!.node.on(Node.EventType.MOUSE_UP, this.backToMenu, this);  //返回選單按鈕
+
         this.gameConfigLoad();
         this.cellInit();
         this.newGame();
     }
 
-    private backToMenu(){  //返回選單按鈕
+    private backToMenu() {  //返回選單按鈕
         game.removePersistRootNode(this.difficultySelect!); //返回選單的時候移除常駐節點
         director.loadScene("Menu");
-}
+    }
 
     private cellScriptGet(cell: Node) {  //取得指定Cell身上的Cell腳本
         return cell.getComponent(Cell)!;
@@ -106,9 +106,9 @@ export class GameManager extends Component {
             for (let x = 0; x < this.col; x++) {
                 let cellNode: Node | null = this.spawnCell();
 
-                if (!cellNode){
+                if (!cellNode) {
                     return;
-                } 
+                }
 
                 this.cellScriptGet(cellNode).tag = (y * this.col) + x;  //此處的tag代表每個生成的格子的編號
                 cellNode.getComponent(UITransform)!.setContentSize(this.cellSize, this.cellSize);  //新格子大小設定
@@ -127,7 +127,7 @@ export class GameManager extends Component {
                     }
                 });
                 this.cells!.addChild(cellNode);  //產生的格子放進父節點
-                this.cellsArray.push(cellNode); 
+                this.cellsArray.push(cellNode);
             }
         }
     }
@@ -151,35 +151,35 @@ export class GameManager extends Component {
         this._gameState = GAME_STATE.PLAY;
     }
 
-    private resetGameUI(){  //重置UI
+    private resetGameUI() {  //重置UI
         this.bombLeft = this.bombNum;  //剩餘炸彈數量回歸
         this.time = 0;  //計時器歸零
         this.schedule(this.timeRun, 1); //遊戲計時器開始
         this.gameMessage!.string = "";
     }
 
-    private resetCells(){  //初始化格子
+    private resetCells() {  //初始化格子
         this.cellsArray.forEach(cell => {
             this.cellScriptGet(cell).type = TYPE.ZERO
             this.cellScriptGet(cell).state = STATE.NONE
         })
     }
 
-    private resetMinesSpawn(){  //隨機生成地雷 並確保地雷不重複選擇同個位置
+    private resetMinesSpawn() {  //隨機生成地雷 並確保地雷不重複選擇同個位置
         let cellsIndex: number[] = [];
-        
+
         this.cellsArray.forEach((cell, index) => {
-            cellsIndex[index] = index;            
+            cellsIndex[index] = index;
         })
-        
-        for (let i = 0; i < this.bombNum; i++) {            
-            let n = Math.floor(Math.random() * cellsIndex.length);            
+
+        for (let i = 0; i < this.bombNum; i++) {
+            let n = Math.floor(Math.random() * cellsIndex.length);
             this.cellScriptGet(this.cellsArray[cellsIndex[n]]).type = TYPE.BOMB
             cellsIndex.splice(n, 1);;  //從此位置刪除一個元素
         }
     }
 
-    private resetMinesAround(){  //標記地雷周圍的格子
+    private resetMinesAround() {  //標記地雷周圍的格子
         this.cellsArray.forEach(cell => {
             let tempBomb = 0;
             if (this.cellScriptGet(cell).type == TYPE.ZERO) {
@@ -240,7 +240,7 @@ export class GameManager extends Component {
         }
     }
 
-    private onTouchCellNone(touchCell : Node){
+    private onTouchCellNone(touchCell: Node) {
         let testCells: Node[] = [];
         testCells.push(touchCell);
         while (testCells.length) {
